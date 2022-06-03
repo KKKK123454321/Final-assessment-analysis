@@ -1,0 +1,301 @@
+---
+title: "Factors influencing performance on the final assessment"
+
+output:
+  pdf_document:
+    toc: yes
+    toc_depth: 2
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '2'
+  word_document:
+    toc: yes
+    toc_depth: '2'
+lang: en
+---
+
+\newpage
+
+```{r, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE , warning = FALSE, message = FALSE)
+
+#install.packages("kableExtra")
+library(car)
+library(MASS)
+library(knitr)
+library(ggplot2)
+library(tidyverse)
+library(gridExtra)
+library(kableExtra)
+library(RColorBrewer)
+
+```
+
+```{r}
+alpha <- 0.05
+```
+
+# 1. Introduction
+
+The Covid-19 pandemic resulted in UTSG closing and teaching occurring through digital media. Teachers' responsibility of "guiding students to gain knowledge independently" has not been fully played in online teaching, resulting in low study efficiency and poor academic achievement for students. High dropout rates and late completion of higher education have become both moral and financial issues. It is a cost to the government and society, a waste of money for the family, and a failure experience for the university student. Early identification of at-risk students allows decision-makers to implement targeted development programmes to reduce dropout and improve academic achievement (Séllei et al., 2021). 
+
+This article reports research that applied MULTIPLE LINEAR REGRESSION as a lens to examine the factors that predict student performance on the final STA302 assessment. On running these models against the dataset it was observed that there is a correlation between students' abilities in individual quizzes with the final overall academic performance. It can be determined that the amount of time they spend studying each quiz, the amount of time they spend studying for COVID each week, and the country they live in are significant factors in influencing their total academic success. Students could use this prediction model as a comprehensive guide to carefully plan out the effort they will need to put in in order to score superlative grades in the coming semester.
+
+In the 'Exploratory data analysis' section, our team will illustrate our cleaned data set and give the most important information from data by presenting tables and plots. The 'Model development' section will explain the statistical method the team used to clean and analyze the data set besides the fully interpreted parameters and variables. At the end of this section, a proper model will be established and explained. The 'Conclusion' section will primarily be focused on presenting results from the 'Model development' section as well as some conclusions about the interpretation of these results will be drawn. Finally, our team will end with some discussions about the potential underlying limitations to our approach of the study.
+
+\newpage
+
+# 2. Exploratory data analysis
+
+The analysis task is to find the factors which predict student performance on the final STA302 assessment (i.e. quiz 4). The variables available in the data collected for this task are quizzes scores, the number of hours that students spend on studying each quiz, the number of hours that students spend on thinking about covid-19 each week, and student’s current stations. Data cleaning is required due to some NA rows founded in the data set. We do so by deleting all NA rows. In addition, an extreme outlier in Covid-19 hours(W1) will be removed. To help expose hidden trends, we disaggregate the data by region. The primary analysis task is approached by fitting a regression model where the Quiz 4 scores are the response variable. However, exploring the data helps us better understand patterns within the data and reveals other interesting features not described by this model.
+
+
+```{r}
+
+data <- read.csv("data.csv", header = T)
+
+data <- data %>% na.omit()
+
+
+data <- data %>% mutate(Region = case_when(Country == "Canada" ~ "North America",
+                                           Country == "USA" ~ "North America",
+                                           
+                                           Country == "China" ~ "East Asia",
+                                           Country == "South Korea" ~ "East Asia",
+                                           Country == "Taiwan" ~ "East Asia",
+                                           Country == "Mongolia" ~ "East Asia",
+                                           
+                                           Country == "India" ~ "South Asia",
+                                           Country == "Pakistan" ~ "South Asia",
+                                          
+                                           Country == "Singapore" ~ "Southeast Asia ",
+                                           
+                                           Country == "UAE" ~ "Western Asia"))
+
+data <- data %>% filter(COVID.hours..W1. < 119)                                          
+                                          
+```
+
+
+Histogram of quiz 4 scores (Figure 1) where the bins cover 1 score increment. The distribution of values is skewed left and unimodal. Data skewed to the left is usually a result of a higher boundary in a data set. Most data falls to the right of the graph's peak. On the left-skewed histogram, the mean is smaller than the median. The few smaller values bring the mean down, and the median is minimally affected.
+```{r}
+
+data %>% ggplot(aes(x = Quiz_4_score)) + theme_bw()+geom_histogram(binwidth=1,col="turquoise3", fill="turquoise3",alpha = 0.5,position = "identity") +                labs(title = "Figure 1:Histogram of STA302 Quiz 4 Scores",  x = "")+
+         theme(plot.title = element_text(hjust = 0.5))
+
+
+
+```
+
+```{r}
+
+summary_Quiz_4_score <- data %>% summarise(Min = min(Quiz_4_score),
+                                           Max = max(Quiz_4_score),
+                                           
+                                           Mean = mean(Quiz_4_score),
+                                           
+                                           Median = median(Quiz_4_score),
+                                           
+                                           SD = sd(Quiz_4_score))
+                                           
+                                           
+                                           kable(summary_Quiz_4_score,format = "pandoc", align=rep('c', 5),caption = "STA302 Quiz 4 Score", digits = 1)
+
+```
+
+
+The following boxplot shows the STA302 students’ quiz 4 scores from 5 regions (Figure 2). Boxes overlap with one another. All median lines lie within the overlap among all boxes. Compare the respective medians of each box, the East Asia group has the greatest median while West Asia has the lowest. In addition, North America and Southeast Asia have the same median. The longer box has more dispersed data. The smaller box has less dispersed data. The whiskers show how big a range there is between those two extremes. East Asia group has larger ranges indicate wider distribution that is more scattered data. Also, the box of East Asia is left-skewed where values gather at the upper end, making a short and tight section there. To the left of that crowd, data points spread out, creating a long tail. On the other hand, both boxes of North American and South Asia are right-skewed where values gather at the lower end.
+```{r}
+
+data %>% ggplot(aes(x = Region, y = Quiz_4_score))+ 
+  geom_boxplot(fill = brewer.pal(5,"Pastel1"))+ 
+  theme_bw()+
+  labs(title = "Figure 2:Boxplot of STA302 Quiz 4 Scores by Region",x = "Region", y = "Score")+
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+
+region_score <- data %>% group_by(Region) %>% summarise(Min = min(Quiz_4_score),
+                                                        Max = max(Quiz_4_score),
+                                                        
+                                                        Mean = mean(Quiz_4_score),
+                                                        
+                                                        Median = median(Quiz_4_score),
+                                                        
+                                                        SD = sd(Quiz_4_score))
+
+
+kable(region_score, caption = "STA302 Quiz 4 Score by Region", digits = 1, align=rep('c', 5),format = "pandoc")
+
+```
+
+Scatterplots of Quiz 4 scores vs explanatory variables (Figure 3). The data don’t seem to resemble any kind of patterns, thus no relationship exists between Quiz 4 scores and explanatory variables.
+```{r}
+
+Quiz4_Quiz1 <- data %>% ggplot(aes(x = Quiz_1_score, y = Quiz_4_score)) +theme_bw()+
+  geom_point(color=brewer.pal(3, "Set1")[1]) + labs(x = "Quiz 1 score", y = "Quiz 4 score")
+
+Quiz4_Quiz2 <- data %>% ggplot(aes(x = Quiz_2_score, y = Quiz_4_score)) +theme_bw()+
+  geom_point(color=brewer.pal(3, "Set1")[2]) + labs(x = "Quiz 2 score", y = "Quiz 4 score")
+
+Quiz4_Quiz3 <- data %>% ggplot(aes(x = Quiz_3_score, y = Quiz_4_score)) +theme_bw()+ 
+  geom_point(color=brewer.pal(3, "Set1")[3]) + labs(x = "Quiz 3 score", y = "Quiz 4 score")
+
+
+
+Quiz4_W1 <- data %>% ggplot(aes(x = STA302.hours..W1., y = Quiz_4_score)) + theme_bw()+
+  geom_point(color=brewer.pal(4, "Set2")[1]) + labs(x = "STA302 Week1 hours", y = "Quiz 4 score")
+
+Quiz4_W2 <- data %>% ggplot(aes(x = STA302.hours..W2., y = Quiz_4_score)) + theme_bw()+
+  geom_point(color=brewer.pal(4, "Set2")[2]) + labs(x = "STA302 Week2 hours", y = "Quiz 4 score")
+
+Quiz4_W3 <- data %>% ggplot(aes(x = STA302.hours..W3., y = Quiz_4_score)) + theme_bw()+
+  geom_point(color=brewer.pal(4, "Set2")[3]) + labs(x = "STA302 Week3 hours", y = "Quiz 4 score")
+
+Quiz4_W4 <- data %>% ggplot(aes(x = STA302.hours..W4., y = Quiz_4_score)) + theme_bw()+
+  geom_point(color=brewer.pal(4, "Set2")[4]) + labs(x = "STA302 Week4 hours", y = "Quiz 4 score")
+
+
+
+Quiz4_COVIDw1 <- data %>% ggplot(aes(x = COVID.hours..W1., y = Quiz_4_score)) + theme_bw()+
+  geom_point(color=brewer.pal(4, "Dark2")[1]) + labs(x = "COVID-19 Week1 hours", y = "Quiz 4 score")
+
+Quiz4_COVIDw2 <- data %>% ggplot(aes(x = COVID.hours..W2., y = Quiz_4_score)) + theme_bw()+
+  geom_point(color=brewer.pal(4, "Dark2")[2]) + labs(x = "COVID-19 Week2 hours", y = "Quiz 4 score")
+
+Quiz4_COVIDw3 <- data %>% ggplot(aes(x = COVID.hours..W3., y = Quiz_4_score)) + theme_bw()+
+  geom_point(color=brewer.pal(4, "Dark2")[3]) + labs(x = "COVID-19 Week3 hours", y = "Quiz 4 score")
+
+Quiz4_COVIDw4 <- data %>% ggplot(aes(x = COVID.hours..W4., y = Quiz_4_score)) + theme_bw()+
+  geom_point(color=brewer.pal(4, "Dark2")[4]) + labs(x = "COVID-19 Week4 hours", y = "Quiz 4 score")
+
+grid.arrange(Quiz4_Quiz1, Quiz4_Quiz2, Quiz4_Quiz3, Quiz4_W1,Quiz4_W2,Quiz4_W3,Quiz4_W4,Quiz4_COVIDw1,Quiz4_COVIDw2,Quiz4_COVIDw3,Quiz4_COVIDw4,nrow=4,top ="Figure 3")
+
+```
+
+\newpage
+
+# 3. Model development 
+
+In terms of the methods we use, we will be modeling Multiple Linear Regression models and selecting the best fitted one. In practice, the effects on explanatory variables usually exist for two or more explanatory variables. A regression analysis of explanatory variables and multiple explanatory variables that present a linear relationship would be a multiple linear regression. 
+
+## 3.1 Model selection
+
+We will use the forward stepwise selection method as the model selection method. This method does not simply add new independent variables. After each addition of variable, it checks to see if the last independent variable added is still significant in the model. If the variable is no longer significant, it will be removed from the model (P-value > 0.1). Thus, the final model is an optimal combination of independent variables. The forward stepwise method is undoubtedly the robust one and is the most common method for screening independent variables in multiple linear regression. The model finally selected Quiz 3 score as the only predictor. 
+
+According to the summaries of the full model and selected model, we discover that the adjusted R-squared of full model is smaller than selected model. This demonstrates the new term improves the model more than would be expected by chance.
+
+```{r}
+
+MLR = lm(Quiz_4_score ~ Quiz_1_score + Quiz_2_score + Quiz_3_score + 
+                        STA302.hours..W1. + STA302.hours..W2. + STA302.hours..W3. + STA302.hours..W4. +
+                        COVID.hours..W1. + COVID.hours..W2. + COVID.hours..W3. + COVID.hours..W4. + 
+                        Region, data=data)
+```
+
+```{r}
+
+MLR1 <- lm(Quiz_4_score ~ Quiz_3_score, data = data)
+
+```
+
+According to the summaries of the full model and selected model, we discover that the adjusted R-squared of full model is smaller than selected model. This demonstrates the new term improves the model more than would be expected by chance.
+
+```{r}
+AdjR_squared <- data.frame(Full_model = 0.2645,
+                           Selected_model = 0.2846)
+
+kbl(colMeans(AdjR_squared), caption = "Adjusted R-squared", digits = 4, format = "pandoc") %>%
+    kable_paper(full_width = F)
+
+```
+
+## 3.2 Model diagnostics
+
+A regression diagnostic is used in statistics to evaluate model assumptions and determine whether or not any observations have a large, undue influence on the analysis (Penrose et al., 1985). The assumptions for linear regression are Linearity, Homoscedasticity, Independence, and Normality. The plot of residuals versus fitted values can be used to examine the assumption of linearity and homoscedasticity. There is no evidence that the linearity assumption is violated if residuals are evenly distributed around a horizontal line without distinct patterns. The Scale-Location plot is useful to check homoscedasticity. If there is a straight line with randomly spread points, there is no indication of heteroscedasticity (constant variance). The Normal Q-Q plot is helpful to evaluate if the errors are normally distributed. There is no indication that the normality assumption is violated if the residuals follow a straight line. Whether there are influential observations can be checked via Residuals versus Leverage plot. When the observations are in the upper right or lower right corner, they have a long Cook's distance and are hence influential.
+
+```{r}
+
+layout(matrix(c(1,2,3,4),2,2))
+
+plot(MLR1)
+
+```
+
+According to the model diagnostics shown above, we could tell the assumptions are mostly satisfied. However, according to the Residuals versus Leverage plot, there could be outliers and influential points. We, therefore, identify and remove outlying and influential points by applying Studentized deleted residuals. After constructing more statistical tests for outliers and drawing Cook's distance plot, we conclude that there is no existing outlier and the influential points are points 7, 19, 30.
+
+```{r}
+t <- rstudent(MLR1)
+
+Pii <- hatvalues(MLR1)
+
+n <- length(data$Quiz_4_score)
+
+
+p_pri = length(coef(MLR1)) 
+
+t_cr <- qt(1-alpha/(2*n),n-(p_pri+1))
+
+#which(abs(t) > t_cr)
+```
+
+
+```{r, out.width="70%"}
+
+plot(MLR1, 4)
+
+```
+\newpage
+Finally, we remove the influential points and construct a summary for the cleaned model. We discover that after removing the influential points, the adjusted R-squared increases from 0.2846 to 0.3379, which demonstrates we successfully added useful variables.
+
+```{r}
+
+AdjR_squared_F <- data.frame(Full_model = 0.2645,
+                    Selected_model = 0.2846,
+                    Cleaned_model = 0.3379)
+
+
+kbl(colMeans(AdjR_squared_F), caption = "Final adjusted R-squared", digits = 4, format = "pandoc") %>%
+    kable_paper(full_width = F)
+
+```
+
+
+```{r}
+
+Data1 <- data[-c(7,19,30),]
+
+MLR2 <- lm(Quiz_4_score ~ Quiz_3_score, data = Data1)
+
+```
+
+
+\newpage
+
+# 4. Conclusion
+
+The multiple linear regression model allows us to make predictions about the response variable based on the information that is known about the explanatory variables. It helps us to determine which explanatory variables are statistically significant. In our MLR model, the quiz 3 score is statistically significant. It determined that there is a relationship between the response variable and the quiz 3 score caused by something other than chance. We later found a positive linear relationship between them by applying a simple linear regression model.
+
+The Quiz 3 score is the only factor that predicts student performance on the final STA302 assessment (i.e. quiz 4). There is a positive linear relationship between them. We can suggest that for every unit increase in quiz 3 score, there is an associated increase in the estimated mean quiz 4 score by a factor of 0.52457.
+
+Due to some NA rows founded earlier in the data set, we must delete all these rows to obtain a clean data set. This results in a limitation in our model. The absence of data reduces statistical power, which refers to the probability that the test will reject the null hypothesis when it is false. Further, the lost data can cause bias in the estimation of parameters. It can reduce the representativeness of the samples as well (Kang, 2013). 
+
+
+
+\newpage
+
+# 5. Bibliography
+
+1. Séllei, B., Stumphauser, N., & Molontay, R. (2021). *Traits versus Grades—The Incremental Predictive Power of Positive Psychological Factors over Pre-Enrollment Achievement Measures on Academic Performance.* Applied Sciences, *11*(4), 1744. [https://doi.org/10.3390/app11041744](https://doi.org/10.3390/app11041744)
+
+2. Penrose, K., Nelson, A., and Fisher, A. (1985). *Generalized Body Composition Prediction Equation for Men Using Simple Measurement Techniques.* Medicine and Science in Sports and Exercise, *17*(2), 189. [https://sphweb.bumc.bu.edu/otlt/MPH-Modules/BS/R/R5_Correlation-Regression/R5_Correlation-Regression7.html](https://sphweb.bumc.bu.edu/otlt/MPH-Modules/BS/R/R5_Correlation-Regression/R5_Correlation-Regression7.html)
+
+3. Kang, H. (2013). *The prevention and handling of the missing data. Korean journal of anesthesiology.* Korean J Anesthesiol. *64*(5), 402–406. [https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3668100/](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3668100/)
+
+
+\newpage
+
+# Appendix
+
